@@ -28,14 +28,34 @@ function livePresence(uid) {
 // Config helpers
 function getConfig(c) {
   const env = c.env;
+  const req = c.req;
+  const originHeader = req.header('origin') || '';
+  const hostHeader = req.header('x-forwarded-host') || req.header('host') || '';
+
+  let hostname = '';
+  if (originHeader) {
+    try { hostname = new URL(originHeader).hostname; } catch {}
+  }
+  if (!hostname && hostHeader) {
+    hostname = hostHeader.split(':')[0];
+  }
+
+  // Desconsidera host de worker direto para o RP_ID se vier pelo proxy do Pages
+  if (hostname.endsWith('.workers.dev') && originHeader && !originHeader.endsWith('.workers.dev')) {
+    try { hostname = new URL(originHeader).hostname; } catch {}
+  }
+
+  const rpId = hostname || env.RP_ID || 'localhost';
+  const origin = originHeader || (hostname ? `https://${hostname}` : (env.ORIGIN || 'http://localhost:5173'));
+
   return {
     RP_NAME: env.RP_NAME || 'natoGym',
-    RP_ID: env.RP_ID || 'localhost',
-    ORIGIN: env.ORIGIN || 'http://localhost:5173',
+    RP_ID: rpId,
+    ORIGIN: origin,
     ADMIN_UIDS: (env.ADMIN_UIDS || '').split(',').map(s => s.trim()).filter(Boolean),
     INVITE_ONLY: /^(1|true|yes|on)$/i.test(env.INVITE_ONLY || ''),
     SESSION_DAYS: Math.max(1, +(env.SESSION_DAYS || 90) || 90),
-    SECURE: /^https:/i.test(env.ORIGIN || '')
+    SECURE: /^https:/i.test(origin)
   };
 }
 
