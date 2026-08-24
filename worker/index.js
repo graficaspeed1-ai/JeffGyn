@@ -111,9 +111,15 @@ function clearSessionCookie(c) {
 // CORS Config
 app.use('*', async (c, next) => {
   const cfg = getConfig(c);
+  const reqOrigin = c.req.header('origin');
+  const allowed = (reqOrigin && (reqOrigin === cfg.ORIGIN || reqOrigin.endsWith('.pages.dev') || /^http:\/\/localhost(:\d+)?$/.test(reqOrigin)))
+    ? reqOrigin
+    : cfg.ORIGIN;
   const corsMiddleware = cors({
-    origin: cfg.ORIGIN,
-    credentials: true
+    origin: allowed,
+    credentials: true,
+    allowHeaders: ['Content-Type', 'Authorization'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
   });
   return corsMiddleware(c, next);
 });

@@ -5,7 +5,7 @@ export const BIO = IS_APPLE ? 'Face ID / Touch ID' : IS_ANDROID ? 'fingerprint o
 export const VAULT = IS_APPLE ? 'iCloud Keychain' : IS_ANDROID ? 'Google Password Manager' : 'your password manager'
 export const webauthnOK = () => !!(window.PublicKeyCredential && navigator.credentials)
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://opengym-api.datomoliveira.workers.dev'
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export async function api(path, opts) {
   const url = path.startsWith('http') ? path : (API_BASE + path)
