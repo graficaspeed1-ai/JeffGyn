@@ -29,7 +29,7 @@ function livePresence(uid) {
 function getConfig(c) {
   const env = c.env;
   return {
-    RP_NAME: env.RP_NAME || 'openGym',
+    RP_NAME: env.RP_NAME || 'natoGym',
     RP_ID: env.RP_ID || 'localhost',
     ORIGIN: env.ORIGIN || 'http://localhost:5173',
     ADMIN_UIDS: (env.ADMIN_UIDS || '').split(',').map(s => s.trim()).filter(Boolean),
@@ -365,7 +365,7 @@ app.post('/api/push/test', async (c) => {
   const user = await readSession(c);
   if (!user) return c.json({ error: 'not signed in' }, 401);
 
-  await sendPushToUser(c.env, user.id, { title: 'openGym', body: 'Test notification ✅ — Cloudflare Worker Push working.', tag: 'test' });
+  await sendPushToUser(c.env, user.id, { title: 'natoGym', body: 'Test notification ✅ — Cloudflare Worker Push working.', tag: 'test' });
   return c.json({ ok: true });
 });
 

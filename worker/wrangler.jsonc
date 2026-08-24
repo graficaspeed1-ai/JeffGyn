@@ -18,7 +18,7 @@
     ]
   },
   "vars": {
-    "RP_NAME": "openGym",
+    "RP_NAME": "natoGym",
     "RP_ID": "opengym-6xo.pages.dev",
     "ORIGIN": "https://opengym-6xo.pages.dev",
     "INVITE_ONLY": "false",
