@@ -6,6 +6,15 @@ export const EXIDX = {}
 EXDB.forEach(e => { EXIDX[e.id] = e })
 export const BODYPARTS = [...new Set(EXDB.map(e => e.bp))].sort()
 
+// Localized display name for an exercise (translated name in active language, fallback to ex.n).
+export const exName = ex => {
+  if (!ex) return ''
+  const item = typeof ex === 'string' ? EXIDX[ex] : ex
+  if (!item) return typeof ex === 'string' ? ex : ''
+  return t(item.n || '') || item.n || ''
+}
+
+
 // Equipment options present in a given list of exercises, most common first (issue #6).
 // Deriving them from the *already filtered* list keeps the chip row short and means
 // every body-part × equipment combination on screen has results behind it.
