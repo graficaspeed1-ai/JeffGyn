@@ -594,7 +594,28 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const key = req.method + ' ' + url.pathname;
   const handler = routes[key];
-  if (!handler) return json(res, 404, { error: 'not found' });
+  if (!handler) {
+    // Serve the built React app from this same Render service. This keeps /api and
+    // the frontend on one origin and avoids relying on Docker Compose service DNS.
+    if ((req.method === 'GET' || req.method === 'HEAD') && !url.pathname.startsWith('/api/')) {
+      const publicDir = path.resolve('/app/public');
+      let requested;
+      try { requested = decodeURIComponent(url.pathname); } catch { requested = '/'; }
+      let file = path.resolve(publicDir, '.' + requested);
+      if (!file.startsWith(publicDir + path.sep) && file !== publicDir) file = path.join(publicDir, 'index.html');
+      try {
+        if (!fs.existsSync(file) || !fs.statSync(file).isFile()) file = path.join(publicDir, 'index.html');
+        const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.json': 'application/json' };
+        res.writeHead(200, { 'Content-Type': types[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': file.endsWith('index.html') ? 'no-cache' : 'public, max-age=31536000, immutable' });
+        if (req.method === 'HEAD') return res.end();
+        return fs.createReadStream(file).pipe(res);
+      } catch (e) {
+        console.error('static file error', e);
+        return json(res, 500, { error: 'static file error' });
+      }
+    }
+    return json(res, 404, { error: 'not found' });
+  }
   try { await handler(req, res); }
   catch (e) {
     console.error(key, e);
