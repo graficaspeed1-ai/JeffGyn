@@ -212,3 +212,25 @@ if you run a modified version as a network service, you must offer that version'
 the same license. Nobody can turn openGym into a closed, proprietary product.
 
 Exercise images/GIFs are fetched from the upstream dataset and keep their own terms — see [NOTICE.md](NOTICE.md).
+
+
+## Meu JeffGyn — recursos em desenvolvimento
+
+Esta personalização adiciona a aba **Treinos prontos**, que permite consultar fichas sem iniciar uma sessão, e um gerador de treinos com IA. As fichas geradas são apresentadas para revisão antes de serem salvas; os exercícios são limitados ao catálogo existente e os dias selecionados são atribuídos ao plano semanal.
+
+### Configurar o gerador de IA
+
+1. Copie `.env.example` para `.env` no ambiente do servidor.
+2. Configure `OPENAI_API_KEY` com uma chave da API OpenAI.
+3. Opcionalmente, configure `OPENAI_MODEL` (padrão: `gpt-4.1`).
+4. Reinicie o serviço da API.
+
+A chave fica somente no backend e nunca deve ser adicionada ao código do frontend, ao GitHub ou enviada em conversas. O endpoint exige uma sessão autenticada. O uso da API pode gerar custos cobrados diretamente pela OpenAI.
+
+### Contas dos alunos
+
+O projeto original oferece perfis individuais com autenticação por passkey (biometria, PIN ou gerenciador de senhas do dispositivo), e o painel administrativo já permite listar, convidar e desativar perfis. Isso **não é o mesmo que login tradicional com usuário e senha**; a migração para senhas convencionais ainda precisa ser implementada antes de anunciar esse método aos alunos.
+
+### Publicação
+
+A publicação em Render ainda depende de configurar o domínio/RP_ID/ORIGIN, persistência de dados compatível com a hospedagem e a chave de IA. Não use dados reais de alunos até validar armazenamento persistente, backups e autenticação no ambiente publicado.

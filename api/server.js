@@ -14,7 +14,7 @@ const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
 const RP_ID = process.env.RP_ID || 'localhost';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
-const RP_NAME = process.env.RP_NAME || 'openGym';
+const RP_NAME = process.env.RP_NAME || 'Meu JeffGyn';
 // Admin dashboard (issue): admins are matched by uid; INVITE_ONLY gates new signups behind a
 // code the admin generates. Both default off so a fresh self-hosted instance stays open.
 const ADMIN_UIDS = (process.env.ADMIN_UIDS || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -370,6 +370,55 @@ const routes = {
     user.sv = sessionVersion(user) + 1;
     saveDb();
     json(res, 200, { ok: true }, { 'Set-Cookie': clearCookie });
+  },
+
+  // AI workout generation. The API key stays on the server and is never sent to browsers.
+  'POST /api/ai/workout': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'Faça login para gerar treinos.' });
+    if (!process.env.OPENAI_API_KEY) return json(res, 503, { error: 'A integração de IA ainda precisa da chave OPENAI_API_KEY nas variáveis do servidor.' });
+    const body = await readBody(req);
+    const instructions = String(body.instructions || '').trim().slice(0, 5000);
+    const days = Array.isArray(body.days) ? body.days.map(x => String(x).slice(0, 20)).slice(0, 7) : [];
+    const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 700).map(x => ({
+      id: String(x.id || '').slice(0, 100), name: String(x.name || '').slice(0, 100),
+      muscle: String(x.muscle || '').slice(0, 60), equipment: String(x.equipment || '').slice(0, 60)
+    })) : [];
+    if (!instructions) return json(res, 400, { error: 'Descreva o treino que deseja.' });
+    if (!catalog.length) return json(res, 400, { error: 'Catálogo de exercícios indisponível.' });
+    const prompt = [
+      'Crie uma ficha de musculação seguindo as instruções do responsável. Responda SOMENTE JSON válido, sem markdown.',
+      'Formato: {"name":"nome curto","notes":"observações","ex":[{"id":"ID_EXATO_DO_CATALOGO","sets":3,"reps":10,"weight":0,"rest":90}]}',
+      'Use exclusivamente IDs presentes no catálogo enviado. Não invente IDs. Respeite dias e instruções, mas não prescreva diagnóstico nem prometa resultados.',
+      'Se houver informação médica, dor, lesão, gravidez ou condição especial, não tente diagnosticar; sinalize que a ficha precisa ser revisada por profissional habilitado.',
+      'Mantenha séries entre 1 e 8, repetições entre 1 e 30, carga entre 0 e 500, descanso entre 15 e 600 segundos. Máximo 25 exercícios.',
+      'Dias solicitados: ' + (days.join(', ') || 'não especificados'),
+      'Instruções do usuário: ' + instructions,
+      'Catálogo disponível: ' + JSON.stringify(catalog)
+    ].join('\n\n');
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4.1', input: prompt, max_output_tokens: 3000 })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error('OpenAI workout error', response.status, data.error?.message || '');
+      return json(res, 502, { error: 'Não foi possível gerar o treino agora. Verifique a configuração da IA no servidor.' });
+    }
+    const output = (data.output || []).flatMap(item => item.content || []).find(part => part.type === 'output_text')?.text || '';
+    let plan;
+    try { plan = JSON.parse(output.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); }
+    catch { return json(res, 502, { error: 'A IA retornou um formato inesperado. Tente novamente.' }); }
+    const allowed = new Set(catalog.map(x => x.id));
+    const ex = (Array.isArray(plan.ex) ? plan.ex : []).slice(0, 25).filter(x => allowed.has(String(x.id))).map(x => ({
+      id: String(x.id), sets: Math.max(1, Math.min(8, Math.round(+x.sets || 3))),
+      reps: Math.max(1, Math.min(30, Math.round(+x.reps || 10))),
+      weight: Math.max(0, Math.min(500, +x.weight || 0)),
+      rest: Math.max(15, Math.min(600, Math.round(+x.rest || 90)))
+    }));
+    if (!ex.length) return json(res, 502, { error: 'A IA não encontrou exercícios válidos no catálogo. Ajuste as instruções e tente novamente.' });
+    json(res, 200, { routine: { name: String(plan.name || 'Treino criado por IA').slice(0, 60), notes: String(plan.notes || '').slice(0, 1000), ex } });
   },
 
   'GET /api/data': async (req, res) => {
