@@ -1,13 +1,13 @@
 {
-  "name": "natoGym",
-  "short_name": "natoGym",
-  "description": "Personal gym & body weight tracker",
+  "name": "Meu JeffGyn",
+  "short_name": "Meu JeffGyn",
+  "description": "Treinos, fichas e evolução dos alunos",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0c0e12",
-  "theme_color": "#0c0e12",
+  "background_color": "#007aff",
+  "theme_color": "#007aff",
   "icons": [
     { "src": "icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
