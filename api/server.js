@@ -12,8 +12,11 @@ import webpush from 'web-push';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
-const RP_ID = process.env.RP_ID || 'localhost';
-const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
+// Render provides the public hostname automatically. Use it as the WebAuthn
+// relying-party ID and HTTPS origin unless explicitly overridden.
+const PUBLIC_HOST = process.env.RENDER_EXTERNAL_HOSTNAME || 'localhost';
+const RP_ID = process.env.RP_ID || PUBLIC_HOST;
+const ORIGIN = process.env.ORIGIN || (PUBLIC_HOST === 'localhost' ? 'http://localhost:8080' : 'https://' + PUBLIC_HOST);
 const RP_NAME = process.env.RP_NAME || 'Meu JeffGyn';
 // Admin dashboard (issue): admins are matched by uid; INVITE_ONLY gates new signups behind a
 // code the admin generates. Both default off so a fresh self-hosted instance stays open.
