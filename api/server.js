@@ -399,7 +399,7 @@ const routes = {
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-6.2-sol', input: prompt, max_output_tokens: 3000 })
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4.1', input: prompt, max_output_tokens: 3000 })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
