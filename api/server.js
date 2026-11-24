@@ -204,6 +204,8 @@ function sessionCookie(user) {
 const clearCookie = `gymsid=; Path=/; Max-Age=0; HttpOnly;${SECURE} SameSite=Lax`;
 
 /* ---------- challenge store (in-memory, 5 min TTL) ---------- */
+const authAttempts = new Map(); // short-lived in-memory brute-force throttling by IP + email
+setInterval(() => { for (const [k, v] of authAttempts) if (v.until < Date.now() && v.count === 0) authAttempts.delete(k); }, 60000).unref();
 const challenges = new Map(); // cid -> {challenge, name?, uid?, exp}
 function putChallenge(data) {
   const cid = crypto.randomBytes(16).toString('base64url');
@@ -265,6 +267,59 @@ const routes = {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } });
+  },
+
+  // Email + password accounts. Passwords are stored as scrypt hashes, never plaintext.
+  'POST /api/auth/register': async (req, res) => {
+    const body = await readBody(req);
+    const name = String(body.name || '').trim().slice(0, 40);
+    const email = String(body.email || '').trim().toLowerCase().slice(0, 254);
+    const password = String(body.password || '');
+    const code = String(body.code || '').trim().toUpperCase();
+    if (name.length < 2) return json(res, 400, { error: 'Informe seu nome (pelo menos 2 caracteres).' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { error: 'Informe um e-mail válido.' });
+    if (password.length < 8 || password.length > 200) return json(res, 400, { error: 'A senha precisa ter entre 8 e 200 caracteres.' });
+    if (db.users.some(u => u.email === email)) return json(res, 409, { error: 'Este e-mail já possui cadastro. Entre na sua conta.' });
+    if (INVITE_ONLY && !db.invites.some(i => i.code === code && !i.usedBy && !i.revoked))
+      return json(res, 403, { error: 'É necessário um código de convite válido.' });
+    const salt = crypto.randomBytes(16).toString('hex');
+    const passwordHash = await new Promise((resolve, reject) => crypto.scrypt(password, salt, 64, (err, key) => err ? reject(err) : resolve(key.toString('hex'))));
+    const user = { id: crypto.randomBytes(12).toString('base64url'), name, email, passwordSalt: salt, passwordHash, created: new Date().toISOString() };
+    // The first account on a fresh installation becomes the gym administrator.
+    if (db.users.length === 0) user.admin = true;
+    if (INVITE_ONLY) {
+      const invite = db.invites.find(i => i.code === code && !i.usedBy && !i.revoked);
+      if (!invite) return json(res, 403, { error: 'O convite não está mais válido. Solicite outro.' });
+      user.invitedBy = invite.code; invite.usedBy = user.id; invite.usedAt = user.created;
+    }
+    db.users.push(user);
+    saveDb();
+    json(res, 201, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
+  },
+
+  'POST /api/auth/login': async (req, res) => {
+    const body = await readBody(req);
+    const email = String(body.email || '').trim().toLowerCase().slice(0, 254);
+    const password = String(body.password || '');
+    const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+    const key = ip + ':' + email;
+    const attempt = authAttempts.get(key) || { count: 0, until: 0 };
+    if (attempt.until > Date.now()) return json(res, 429, { error: 'Muitas tentativas. Aguarde 15 minutos e tente novamente.' });
+    const user = db.users.find(u => u.email === email && u.passwordHash && u.passwordSalt);
+    let valid = false;
+    if (user && password.length <= 200) {
+      const hash = await new Promise((resolve, reject) => crypto.scrypt(password, user.passwordSalt, 64, (err, value) => err ? reject(err) : resolve(value)));
+      const expected = Buffer.from(user.passwordHash, 'hex');
+      valid = expected.length === hash.length && crypto.timingSafeEqual(expected, hash);
+    }
+    if (!valid || user.disabled) {
+      attempt.count += 1;
+      if (attempt.count >= 8) { attempt.count = 0; attempt.until = Date.now() + 15 * 60000; }
+      authAttempts.set(key, attempt);
+      return json(res, 401, { error: 'E-mail ou senha incorretos.' });
+    }
+    authAttempts.delete(key);
+    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   'POST /api/register/options': async (req, res) => {
