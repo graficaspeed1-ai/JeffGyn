@@ -13,19 +13,30 @@ function RegisterSheet({ close }) {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [inviteOnly, setInviteOnly] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
   const ref = useRef(null)
   useEffect(() => { setTimeout(() => ref.current?.focus(), 250) }, [])
   useEffect(() => { api('/api/config').then(c => setInviteOnly(!!c.invite_only)).catch(() => {}) }, [])
   const go = async () => {
+    // Prevent overlapping WebAuthn prompts; browsers reject concurrent credential requests.
+    if (busyRef.current) return
     const n = name.trim()
     if (!n) { useUI.getState().toast(t('Enter a name')); return }
     if (inviteOnly && !code.trim()) { useUI.getState().toast(t('An invite code is required')); return }
+    busyRef.current = true
+    setBusy(true)
     try {
       const u = await passkeyRegister(n, code.trim())
       setUser(u); close()
       if (hasData(useStore.getState().S)) { await pushState(); useUI.getState().toast(t('Profile created — data from this device moved into it')) }
       else { await pullState(); useUI.getState().toast(t('Welcome, {0}', u.name)) }
-    } catch (e) { if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') useUI.getState().toast(e.message || t('Registration failed')) }
+    } catch (e) {
+      if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') useUI.getState().toast(e.message || t('Registration failed'))
+    } finally {
+      busyRef.current = false
+      setBusy(false)
+    }
   }
   return <>
     <h3>{t('Create your profile')}</h3>
@@ -38,7 +49,7 @@ function RegisterSheet({ close }) {
       <div className="dim small" style={{ marginTop: 6 }}>{t('This app is invite-only — enter the code you were given.')}</div>
     </>}
     <div style={{ height: 12 }} />
-    <Button variant="primary" onClick={go}>{t('Create passkey')}</Button>
+    <Button variant="primary" onClick={go} disabled={busy}>{busy ? 'Aguarde…' : t('Create passkey')}</Button>
   </>
 }
 
