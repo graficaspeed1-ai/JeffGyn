@@ -88,6 +88,45 @@ function InvitesCard({ invites, reload }) {
   </div>
 }
 
+
+function AIKeyCard() {
+  const [key, setKey] = useState('')
+  const [configured, setConfigured] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const toast = useUI(s => s.toast)
+  const load = () => api('/api/admin/settings/ai-key').then(r => setConfigured(!!r.configured)).catch(e => toast(e.message))
+  useEffect(() => { load() }, [])
+  const save = async () => {
+    if (!key.trim()) return toast('Cole a chave da API antes de salvar.')
+    setBusy(true)
+    try {
+      await api('/api/admin/settings/ai-key', { method: 'PUT', body: JSON.stringify({ apiKey: key.trim() }) })
+      setKey(''); setConfigured(true); toast('Chave da OpenAI salva com segurança.')
+    } catch (e) { toast(e.message || 'Não foi possível salvar a chave.') }
+    finally { setBusy(false) }
+  }
+  const clear = async () => {
+    setBusy(true)
+    try {
+      await api('/api/admin/settings/ai-key', { method: 'PUT', body: JSON.stringify({ apiKey: '' }) })
+      setKey(''); setConfigured(false); toast('Chave removida.')
+    } catch (e) { toast(e.message || 'Não foi possível remover a chave.') }
+    finally { setBusy(false) }
+  }
+  return <div className="card" style={{ marginBottom: 12 }}>
+    <h2 style={{ margin: '0 0 6px' }}>Configuração da inteligência artificial</h2>
+    <div className="small muted" style={{ marginBottom: 10 }}>Somente administradores podem configurar a chave. Ela fica guardada no servidor e nunca é exibida novamente.</div>
+    <div className="row between small" style={{ marginBottom: 8 }}>
+      <span>Chave da OpenAI</span><span className="tag">{configured ? 'Configurada' : 'Não configurada'}</span>
+    </div>
+    <input className="input" type="password" autoComplete="new-password" value={key} onChange={e => setKey(e.target.value)} placeholder="Cole sua chave da API (sk-...)" />
+    <div className="row" style={{ gap: 8, marginTop: 10 }}>
+      <Button variant="primary" size="sm" onClick={save} disabled={busy || !key.trim()}>Salvar chave</Button>
+      {configured && <Button size="sm" variant="tinted" onClick={clear} disabled={busy}>Remover chave</Button>}
+    </div>
+  </div>
+}
+
 export default function Admin() {
   const nav = useNavigate()
   const user = useStore(s => s.user)
@@ -131,6 +170,8 @@ export default function Admin() {
         <span className="tag acc">{dur(Date.now() - u.live.startedAt)}</span>
       </div>)}
     </div>}
+
+    <AIKeyCard />
 
     <InvitesCard invites={invites} reload={loadInvites} />
 
