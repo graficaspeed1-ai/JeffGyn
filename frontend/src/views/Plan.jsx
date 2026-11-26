@@ -39,7 +39,7 @@ export default function Plan() {
     setAiLoading(true); setAiError(''); setAiDraft(null)
     try {
       const catalog = allExercises(S).map(ex => ({ id: ex.id, name: ex.n, muscle: ex.bp, equipment: ex.eq }))
-      const result = await api('/api/ai/workout', { method: 'POST', body: JSON.stringify({ instructions: aiInstructions, days: aiDays.map(d => weekDays.find(x => x.id === d)?.name), catalog }) })
+      const result = await api('/api/ai/workout', { method: 'POST', body: JSON.stringify({ instructions: aiInstructions, days: aiDays.map(d => weekDays.find(x => x.id === d)?.name), profile: { age: S.profile?.age || null, heightCm: S.profile?.heightCm || null, weightKg: S.profile?.weightKg || (S.bodyweight?.length ? S.bodyweight[S.bodyweight.length - 1].w : null) }, catalog }) })
       setAiDraft(result.routine)
     } catch (e) { setAiError(e.message || 'Não foi possível gerar o treino.') }
     finally { setAiLoading(false) }
