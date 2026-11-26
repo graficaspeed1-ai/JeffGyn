@@ -474,7 +474,7 @@ const routes = {
       if (!hasKey) return json(res, 400, { error: 'Cadastre uma chave para este provedor antes de ativá-lo.' });
       db.settings.activeAIProvider = provider;
     }
-    if (body.remove && db.settings.activeAIProvider === provider) db.settings.activeAIProvider = 'openai';
+    if (body.remove && db.settings.activeAIProvider === provider) db.settings.activeAIProvider = allowed.find(id => db.settings.aiKeys[id] || (id === 'openai' && (db.settings.openaiApiKey || process.env.OPENAI_API_KEY))) || 'openai';
     saveDb();
     const configured = Object.fromEntries(allowed.map(id => [id, !!(db.settings.aiKeys[id] || (id === 'openai' && (db.settings.openaiApiKey || process.env.OPENAI_API_KEY)))]));
     json(res, 200, { ok: true, configured, activeProvider: db.settings.activeAIProvider || 'openai', models: db.settings.aiModels || {} });
