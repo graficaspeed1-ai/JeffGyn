@@ -90,40 +90,82 @@ function InvitesCard({ invites, reload }) {
 
 
 function AIKeyCard() {
+  const providers = [
+    { id: 'openai', name: 'OpenAI', model: 'gpt-4o-mini', hint: 'Chave da OpenAI' },
+    { id: 'gemini', name: 'Google Gemini', model: 'gemini-2.0-flash', hint: 'Chave do Google AI Studio' },
+    { id: 'anthropic', name: 'Anthropic Claude', model: 'claude-3-5-haiku-latest', hint: 'Chave da Anthropic' },
+    { id: 'openrouter', name: 'OpenRouter', model: 'openai/gpt-4o-mini', hint: 'Chave do OpenRouter' },
+  ]
+  const [provider, setProvider] = useState('openai')
+  const [model, setModel] = useState('gpt-4o-mini')
   const [key, setKey] = useState('')
-  const [configured, setConfigured] = useState(false)
+  const [configured, setConfigured] = useState({})
+  const [activeProvider, setActiveProvider] = useState('openai')
   const [busy, setBusy] = useState(false)
   const toast = useUI(s => s.toast)
-  const load = () => api('/api/admin/settings/ai-key').then(r => setConfigured(!!r.configured)).catch(e => toast(e.message))
+  const selected = providers.find(p => p.id === provider) || providers[0]
+  const load = () => api('/api/admin/settings/ai-keys').then(r => {
+    setConfigured(r.configured || {}); setActiveProvider(r.activeProvider || 'openai')
+    setProvider(r.activeProvider || 'openai')
+    const active = providers.find(p => p.id === (r.activeProvider || 'openai'))
+    setModel(r.models?.[r.activeProvider] || active?.model || 'gpt-4o-mini')
+  }).catch(e => toast(e.message))
   useEffect(() => { load() }, [])
+  const choose = value => {
+    setProvider(value)
+    const item = providers.find(p => p.id === value)
+    setModel(item?.model || '')
+    setKey('')
+  }
   const save = async () => {
-    if (!key.trim()) return toast('Cole a chave da API antes de salvar.')
+    if (!key.trim()) return toast('Insira a chave da API.')
     setBusy(true)
     try {
-      await api('/api/admin/settings/ai-key', { method: 'PUT', body: JSON.stringify({ apiKey: key.trim() }) })
-      setKey(''); setConfigured(true); toast('Chave da OpenAI salva com segurança.')
+      const r = await api('/api/admin/settings/ai-keys', { method: 'PUT', body: JSON.stringify({ provider, apiKey: key.trim(), model: model.trim(), activate: true }) })
+      setConfigured(r.configured || {}); setActiveProvider(provider); setKey('')
+      toast('Chave salva com segurança e provedor ativado.')
     } catch (e) { toast(e.message || 'Não foi possível salvar a chave.') }
     finally { setBusy(false) }
   }
-  const clear = async () => {
+  const activate = async () => {
     setBusy(true)
     try {
-      await api('/api/admin/settings/ai-key', { method: 'PUT', body: JSON.stringify({ apiKey: '' }) })
-      setKey(''); setConfigured(false); toast('Chave removida.')
+      const r = await api('/api/admin/settings/ai-keys', { method: 'PUT', body: JSON.stringify({ provider, activate: true, model: model.trim() }) })
+      setConfigured(r.configured || {}); setActiveProvider(provider)
+      toast('Provedor de IA ativado.')
+    } catch (e) { toast(e.message || 'Não foi possível ativar o provedor.') }
+    finally { setBusy(false) }
+  }
+  const remove = async () => {
+    setBusy(true)
+    try {
+      const r = await api('/api/admin/settings/ai-keys', { method: 'PUT', body: JSON.stringify({ provider, apiKey: '', remove: true }) })
+      setConfigured(r.configured || {}); setKey('')
+      if (activeProvider === provider) setActiveProvider(r.activeProvider || 'openai')
+      toast('Chave removida.')
     } catch (e) { toast(e.message || 'Não foi possível remover a chave.') }
     finally { setBusy(false) }
   }
   return <div className="card" style={{ marginBottom: 12 }}>
-    <h2 style={{ margin: '0 0 6px' }}>Configuração da inteligência artificial</h2>
-    <div className="small muted" style={{ marginBottom: 10 }}>Somente administradores podem configurar a chave. Ela fica guardada no servidor e nunca é exibida novamente.</div>
+    <h2 style={{ margin: '0 0 6px' }}>Chaves de APIs de inteligência artificial</h2>
+    <div className="small muted" style={{ marginBottom: 12 }}>Somente administradores podem cadastrar chaves. Elas são criptografadas no servidor e nunca aparecem novamente na tela.</div>
+    <label className="small">Provedor de IA</label>
+    <select className="input" value={provider} onChange={e => choose(e.target.value)} style={{ margin: '5px 0 10px' }}>
+      {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+    </select>
     <div className="row between small" style={{ marginBottom: 8 }}>
-      <span>Chave da OpenAI</span><span className="tag">{configured ? 'Configurada' : 'Não configurada'}</span>
+      <span>{selected.name}</span><span className="tag">{configured[provider] ? 'Chave cadastrada' : 'Sem chave'}</span>
     </div>
-    <input className="input" type="password" autoComplete="new-password" value={key} onChange={e => setKey(e.target.value)} placeholder="Cole sua chave da API (sk-...)" />
-    <div className="row" style={{ gap: 8, marginTop: 10 }}>
-      <Button variant="primary" size="sm" onClick={save} disabled={busy || !key.trim()}>Salvar chave</Button>
-      {configured && <Button size="sm" variant="tinted" onClick={clear} disabled={busy}>Remover chave</Button>}
+    <label className="small">Modelo</label>
+    <input className="input" value={model} onChange={e => setModel(e.target.value)} placeholder={selected.model} style={{ margin: '5px 0 10px' }} />
+    <label className="small">Chave da API</label>
+    <input className="input" type="password" autoComplete="new-password" value={key} onChange={e => setKey(e.target.value)} placeholder={selected.hint} />
+    <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+      <Button variant="primary" size="sm" onClick={save} disabled={busy || !key.trim()}>Salvar e ativar</Button>
+      {configured[provider] && <Button size="sm" variant="tinted" onClick={activate} disabled={busy}>Usar este provedor</Button>}
+      {configured[provider] && <Button size="sm" variant="tinted" onClick={remove} disabled={busy}>Remover chave</Button>}
     </div>
+    <div className="small muted" style={{ marginTop: 10 }}>Provedor em uso: {providers.find(p => p.id === activeProvider)?.name || activeProvider}.</div>
   </div>
 }
 
