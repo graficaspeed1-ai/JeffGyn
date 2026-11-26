@@ -43,7 +43,24 @@ let db = { users: [], creds: [], subs: [], invites: [] };
 try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch {}
 db.subs = db.subs || [];
 db.invites = db.invites || [];
+db.settings = db.settings || {};
 const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
+const SETTINGS_KEY = crypto.createHash('sha256').update(SECRET).digest();
+function encryptSetting(value) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', SETTINGS_KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  return [iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join('.');
+}
+function decryptSetting(value) {
+  if (!value) return '';
+  try {
+    const [iv, tag, data] = value.split('.');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', SETTINGS_KEY, Buffer.from(iv, 'base64url'));
+    decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+    return Buffer.concat([decipher.update(Buffer.from(data, 'base64url')), decipher.final()]).toString('utf8');
+  } catch { return ''; }
+}
 function saveDb() { atomicWrite(dbFile, JSON.stringify(db, null, 2)); }
 function atomicWrite(file, content) {
   const tmp = file + '.tmp';
@@ -286,7 +303,7 @@ const routes = {
     const passwordHash = await new Promise((resolve, reject) => crypto.scrypt(password, salt, 64, (err, key) => err ? reject(err) : resolve(key.toString('hex'))));
     const user = { id: crypto.randomBytes(12).toString('base64url'), name, email, passwordSalt: salt, passwordHash, created: new Date().toISOString() };
     // The first account on a fresh installation becomes the gym administrator.
-    if (db.users.length === 0) user.admin = true;
+    if (!db.users.some(isAdmin)) user.admin = true;
     if (INVITE_ONLY) {
       const invite = db.invites.find(i => i.code === code && !i.usedBy && !i.revoked);
       if (!invite) return json(res, 403, { error: 'O convite não está mais válido. Solicite outro.' });
@@ -430,11 +447,29 @@ const routes = {
     json(res, 200, { ok: true }, { 'Set-Cookie': clearCookie });
   },
 
+  'GET /api/admin/settings/ai-key': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    json(res, 200, { configured: !!(db.settings.openaiApiKey || process.env.OPENAI_API_KEY) });
+  },
+
+  'PUT /api/admin/settings/ai-key': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req);
+    const apiKey = String(body.apiKey || '').trim();
+    if (apiKey && (!apiKey.startsWith('sk-') || apiKey.length < 20 || apiKey.length > 500))
+      return json(res, 400, { error: 'A chave informada não parece ser uma chave válida da OpenAI.' });
+    if (apiKey) db.settings.openaiApiKey = encryptSetting(apiKey);
+    else delete db.settings.openaiApiKey;
+    saveDb();
+    json(res, 200, { ok: true, configured: !!apiKey });
+  },
+
   // AI workout generation. The API key stays on the server and is never sent to browsers.
   'POST /api/ai/workout': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'Faça login para gerar treinos.' });
-    if (!process.env.OPENAI_API_KEY) return json(res, 503, { error: 'A integração de IA ainda precisa da chave OPENAI_API_KEY nas variáveis do servidor.' });
+    const openaiApiKey = decryptSetting(db.settings.openaiApiKey) || process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) return json(res, 503, { error: 'O administrador ainda precisa configurar a chave da OpenAI em Administração.' });
     const body = await readBody(req);
     const instructions = String(body.instructions || '').trim().slice(0, 5000);
     const days = Array.isArray(body.days) ? body.days.map(x => String(x).slice(0, 20)).slice(0, 7) : [];
