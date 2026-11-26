@@ -93,7 +93,7 @@ export const useStore = create((set, get) => {
     replaceState(S, push = false) { persist(clone(S), push) },
 
     isGuest: () => localStorage.getItem('gym_guest') === '1',
-    setGuest(v) { if (v) localStorage.setItem('gym_guest', '1'); else localStorage.removeItem('gym_guest'); set({}) },
+    setGuest(v) { localStorage.removeItem('gym_guest'); set({}) },
 
     setUser(u) {
       if (u) { localStorage.setItem('gym_user', JSON.stringify(u)); localStorage.removeItem('gym_guest') }
@@ -157,7 +157,7 @@ export const useStore = create((set, get) => {
         } else if (hasData(S)) {
           nativeSave(S)   // first run after an update from a file-less version: seed the mirror
         }
-        get().setGuest(true)
+        get().setGuest(false)
         syncReminder(get().S)
         set({ ready: true })
         return
@@ -168,7 +168,7 @@ export const useStore = create((set, get) => {
           localStorage.setItem(DEMO_SEEDED, '1')
           await get().resetDemo()
         }
-        get().setGuest(true)
+        get().setGuest(false)
         set({ ready: true })
         return
       }
