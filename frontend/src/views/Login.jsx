@@ -2,7 +2,6 @@ import { useStore, hasData } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { api } from '../lib/api.js'
 import { t } from '../lib/i18n.js'
-import { DEMO, REPO } from '../lib/demo.js'
 import { useState, useEffect } from 'react'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
@@ -65,7 +64,7 @@ function RegisterSheet({ close }) {
 }
 
 export default function Login() {
-  const { setUser, pullState, setGuest } = useStore()
+  const { setUser, pullState } = useStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -92,20 +91,6 @@ export default function Login() {
   </>
   const wrap = { display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '78vh', textAlign: 'center' }
 
-  if (DEMO) return (
-    <div className="narrow" style={wrap}>
-      {head}
-      <div className="muted" style={{ marginBottom: 30 }}>{t('Live demo — everything stays in this browser.')}</div>
-      <Button variant="primary" icon="sparkles" onClick={() => setGuest(true)}>{t('Start the demo')}</Button>
-      <div className="card small muted" style={{ textAlign: 'left', marginTop: 16 }}>
-        {t('This demo runs entirely in your browser on example data — nothing is sent anywhere.')}
-      </div>
-      <div className="dim small" style={{ marginTop: 22, lineHeight: 1.6 }}>
-        <a href={REPO} target="_blank" rel="noopener">{t('Self-host it in a minute →')}</a>
-      </div>
-    </div>
-  )
-
   return (
     <div className="narrow" style={wrap}>
       {head}
@@ -120,7 +105,7 @@ export default function Login() {
       <div style={{ height: 10 }} />
       <Button variant="ghost" className="dim" onClick={() => setGuest(true)}>Continuar sem conta</Button>
       <div className="dim small" style={{ marginTop: 22, lineHeight: 1.5 }}>
-        Cada aluno tem seu próprio acesso e seus próprios treinos.
+        Acesse com seu e-mail e senha. Cada aluno tem seus próprios treinos.
       </div>
     </div>
   )
