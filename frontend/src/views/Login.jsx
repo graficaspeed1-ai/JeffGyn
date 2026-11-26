@@ -103,7 +103,6 @@ export default function Login() {
       <div style={{ height: 10 }} />
       <Button icon="sparkles" onClick={() => useUI.getState().openSheet(close => <RegisterSheet close={close} />)}>Criar conta de aluno</Button>
       <div style={{ height: 10 }} />
-      <Button variant="ghost" className="dim" onClick={() => setGuest(true)}>Continuar sem conta</Button>
       <div className="dim small" style={{ marginTop: 22, lineHeight: 1.5 }}>
         Acesse com seu e-mail e senha. Cada aluno tem seus próprios treinos.
       </div>
