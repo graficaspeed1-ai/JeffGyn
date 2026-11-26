@@ -43,7 +43,7 @@ let db = { users: [], creds: [], subs: [], invites: [] };
 try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch {}
 db.subs = db.subs || [];
 db.invites = db.invites || [];
-db.settings = db.settings || {};
+db.settings = db.settings || {}; db.settings.aiKeys = db.settings.aiKeys || {}; db.settings.aiModels = db.settings.aiModels || {};
 const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
 const SETTINGS_KEY = crypto.createHash('sha256').update(SECRET).digest();
 function encryptSetting(value) {
@@ -447,32 +447,54 @@ const routes = {
     json(res, 200, { ok: true }, { 'Set-Cookie': clearCookie });
   },
 
-  'GET /api/admin/settings/ai-key': async (req, res) => {
+  'GET /api/admin/settings/ai-keys': async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    json(res, 200, { configured: !!(db.settings.openaiApiKey || process.env.OPENAI_API_KEY) });
+    const configured = Object.fromEntries(['openai','gemini','anthropic','openrouter'].map(id => [id, !!(db.settings.aiKeys[id] || (id === 'openai' && (db.settings.openaiApiKey || process.env.OPENAI_API_KEY)))]));
+    json(res, 200, { configured, activeProvider: db.settings.activeAIProvider || 'openai', models: db.settings.aiModels || {} });
   },
 
-  'PUT /api/admin/settings/ai-key': async (req, res) => {
+  'PUT /api/admin/settings/ai-keys': async (req, res) => {
     if (!requireAdmin(req, res)) return;
     const body = await readBody(req);
-    const apiKey = String(body.apiKey || '').trim();
-    if (apiKey && (!apiKey.startsWith('sk-') || apiKey.length < 20 || apiKey.length > 500))
-      return json(res, 400, { error: 'A chave informada não parece ser uma chave válida da OpenAI.' });
-    if (apiKey) db.settings.openaiApiKey = encryptSetting(apiKey);
-    else delete db.settings.openaiApiKey;
+    const provider = String(body.provider || '');
+    const allowed = ['openai','gemini','anthropic','openrouter'];
+    if (!allowed.includes(provider)) return json(res, 400, { error: 'Provedor de IA não suportado.' });
+    if (body.apiKey !== undefined) {
+      const apiKey = String(body.apiKey || '').trim();
+      if (apiKey && (apiKey.length < 12 || apiKey.length > 500)) return json(res, 400, { error: 'A chave informada parece inválida.' });
+      if (body.remove || !apiKey) delete db.settings.aiKeys[provider];
+      else db.settings.aiKeys[provider] = encryptSetting(apiKey);
+    }
+    if (body.model !== undefined) {
+      const model = String(body.model || '').trim().slice(0, 120);
+      if (model) db.settings.aiModels[provider] = model;
+    }
+    if (body.activate) {
+      const hasKey = !!db.settings.aiKeys[provider] || (provider === 'openai' && !!(db.settings.openaiApiKey || process.env.OPENAI_API_KEY));
+      if (!hasKey) return json(res, 400, { error: 'Cadastre uma chave para este provedor antes de ativá-lo.' });
+      db.settings.activeAIProvider = provider;
+    }
+    if (body.remove && db.settings.activeAIProvider === provider) db.settings.activeAIProvider = 'openai';
     saveDb();
-    json(res, 200, { ok: true, configured: !!apiKey });
+    const configured = Object.fromEntries(allowed.map(id => [id, !!(db.settings.aiKeys[id] || (id === 'openai' && (db.settings.openaiApiKey || process.env.OPENAI_API_KEY)))]));
+    json(res, 200, { ok: true, configured, activeProvider: db.settings.activeAIProvider || 'openai', models: db.settings.aiModels || {} });
   },
 
   // AI workout generation. The API key stays on the server and is never sent to browsers.
   'POST /api/ai/workout': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'Faça login para gerar treinos.' });
-    const openaiApiKey = decryptSetting(db.settings.openaiApiKey) || process.env.OPENAI_API_KEY;
-    if (!openaiApiKey) return json(res, 503, { error: 'O administrador ainda precisa configurar a chave da OpenAI em Administração.' });
+    const provider = db.settings.activeAIProvider || 'openai';
+    const key = decryptSetting(db.settings.aiKeys[provider]) || (provider === 'openai' ? (decryptSetting(db.settings.openaiApiKey) || process.env.OPENAI_API_KEY) : '');
+    if (!key) return json(res, 503, { error: 'O administrador precisa cadastrar e ativar uma chave de API em Administração.' });
     const body = await readBody(req);
     const instructions = String(body.instructions || '').trim().slice(0, 5000);
     const days = Array.isArray(body.days) ? body.days.map(x => String(x).slice(0, 20)).slice(0, 7) : [];
+    const profile = body.profile && typeof body.profile === 'object' ? {
+      age: Number.isFinite(+body.profile.age) && +body.profile.age >= 13 && +body.profile.age <= 100 ? +body.profile.age : null,
+      heightCm: Number.isFinite(+body.profile.heightCm) && +body.profile.heightCm >= 100 && +body.profile.heightCm <= 250 ? +body.profile.heightCm : null,
+      weightKg: Number.isFinite(+body.profile.weightKg) && +body.profile.weightKg >= 25 && +body.profile.weightKg <= 350 ? +body.profile.weightKg : null
+    } : {};
     const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 700).map(x => ({
       id: String(x.id || '').slice(0, 100), name: String(x.name || '').slice(0, 100),
       muscle: String(x.muscle || '').slice(0, 60), equipment: String(x.equipment || '').slice(0, 60)
@@ -483,23 +505,41 @@ const routes = {
       'Crie uma ficha de musculação seguindo as instruções do responsável. Responda SOMENTE JSON válido, sem markdown.',
       'Formato: {"name":"nome curto","notes":"observações","ex":[{"id":"ID_EXATO_DO_CATALOGO","sets":3,"reps":10,"weight":0,"rest":90}]}',
       'Use exclusivamente IDs presentes no catálogo enviado. Não invente IDs. Respeite dias e instruções, mas não prescreva diagnóstico nem prometa resultados.',
+      'Use idade, altura e peso como contexto para adaptar volume e intensidade com prudência. Não estime cargas máximas nem recomende restrição calórica.',
       'Se houver informação médica, dor, lesão, gravidez ou condição especial, não tente diagnosticar; sinalize que a ficha precisa ser revisada por profissional habilitado.',
       'Mantenha séries entre 1 e 8, repetições entre 1 e 30, carga entre 0 e 500, descanso entre 15 e 600 segundos. Máximo 25 exercícios.',
+      'Perfil: idade=' + (profile.age ?? 'não informado') + ' anos; altura=' + (profile.heightCm ?? 'não informada') + ' cm; peso=' + (profile.weightKg ?? 'não informado') + ' kg.',
       'Dias solicitados: ' + (days.join(', ') || 'não especificados'),
       'Instruções do usuário: ' + instructions,
       'Catálogo disponível: ' + JSON.stringify(catalog)
     ].join('\n\n');
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + openaiApiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4.1', input: prompt, max_output_tokens: 3000 })
-    });
+    const model = db.settings.aiModels?.[provider] || ({ openai: 'gpt-4o-mini', gemini: 'gemini-2.0-flash', anthropic: 'claude-3-5-haiku-latest', openrouter: 'openai/gpt-4o-mini' }[provider]);
+    let response, output = '';
+    if (provider === 'gemini') {
+      response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.4 } })
+      });
+    } else if (provider === 'anthropic') {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model, max_tokens: 3000, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
+      });
+    } else {
+      const endpoint = provider === 'openrouter' ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
+      response = await fetch(endpoint, {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.4, response_format: { type: 'json_object' } })
+      });
+    }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      console.error('OpenAI workout error', response.status, data.error?.message || '');
-      return json(res, 502, { error: 'Não foi possível gerar o treino agora. Verifique a configuração da IA no servidor.' });
+      console.error('AI workout error', provider, response.status, data.error?.message || data.message || '');
+      return json(res, 502, { error: 'Não foi possível gerar o treino. Verifique a chave, o modelo e o saldo do provedor escolhido.' });
     }
-    const output = (data.output || []).flatMap(item => item.content || []).find(part => part.type === 'output_text')?.text || '';
+    if (provider === 'gemini') output = data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+    else if (provider === 'anthropic') output = data.content?.filter(p => p.type === 'text').map(p => p.text).join('') || '';
+    else output = data.choices?.[0]?.message?.content || '';
     let plan;
     try { plan = JSON.parse(output.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); }
     catch { return json(res, 502, { error: 'A IA retornou um formato inesperado. Tente novamente.' }); }
