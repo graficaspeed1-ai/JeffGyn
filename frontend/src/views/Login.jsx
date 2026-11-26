@@ -54,7 +54,7 @@ function RegisterSheet({ close }) {
     <div style={{ height: 10 }} />
     <div style={{ position: 'relative' }}>
       <input className="input" style={{ paddingRight: 46 }} type={showPassword ? 'text' : 'password'} placeholder="Crie uma senha (mínimo 8 caracteres)" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} />
-      <button type="button" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} title={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', color: 'var(--muted)', padding: 6, cursor: 'pointer' }}><Icon name={showPassword ? 'eye-off' : 'eye'} /></button>
+      <button type="button" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} title={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword(v => !v)} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 0, borderRadius: 8, background: 'transparent', color: '#64748b', padding: 0, cursor: 'pointer', zIndex: 2, fontSize: 20 }}><span aria-hidden="true">{showPassword ? '🙈' : '👁️'}</span></button>
     </div>
     <div style={{ height: 10 }} />
     <div style={{ position: 'relative' }}>
