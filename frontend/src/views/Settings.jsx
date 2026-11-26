@@ -85,7 +85,20 @@ export default function Settings() {
         <Row icon="lock" iconTint="var(--grey)" title="Entre com e-mail e senha para acessar sua conta." />
       )}
     </Section>
-    {!user && !DEMO && !MOBILE && <p className="sect-f" style={{ marginTop: -18, marginBottom: 22 }}>{t('Guest mode — data lives only in this browser.')}</p>}
+
+    <Section title="Dados para personalizar seus treinos" footer="Essas informações são usadas pela IA para adaptar as sugestões. Mantenha os dados atualizados.">
+      <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <label className="small">Idade (anos)
+          <input className="input" type="number" min="13" max="100" placeholder="Ex.: 30" value={S.profile?.age ?? ''} onChange={e => update(s => { s.profile = { ...(s.profile || {}), age: e.target.value === '' ? null : Math.max(13, Math.min(100, Number(e.target.value))) } })} />
+        </label>
+        <label className="small">Altura (cm)
+          <input className="input" type="number" min="100" max="250" placeholder="Ex.: 170" value={S.profile?.heightCm ?? ''} onChange={e => update(s => { s.profile = { ...(s.profile || {}), heightCm: e.target.value === '' ? null : Math.max(100, Math.min(250, Number(e.target.value))) } })} />
+        </label>
+        <label className="small" style={{ gridColumn: '1 / -1' }}>Peso atual (kg)
+          <input className="input" type="number" min="25" max="350" step="0.1" placeholder="Ex.: 70" value={S.profile?.weightKg ?? (S.bodyweight?.length ? S.bodyweight[S.bodyweight.length - 1].w : '')} onChange={e => update(s => { s.profile = { ...(s.profile || {}), weightKg: e.target.value === '' ? null : Math.max(25, Math.min(350, Number(e.target.value))) } })} />
+        </label>
+      </div>
+    </Section>
 
     {/* ---------- general ---------- */}
     <Section title={t('General')} footer={t('Note: switching units only changes the label — logged numbers are not converted.')}>
