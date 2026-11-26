@@ -12,6 +12,8 @@ function RegisterSheet({ close }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [code, setCode] = useState('')
   const [inviteOnly, setInviteOnly] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -50,9 +52,15 @@ function RegisterSheet({ close }) {
     <div style={{ height: 10 }} />
     <input className="input" type="email" placeholder="E-mail" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} />
     <div style={{ height: 10 }} />
-    <input className="input" type="password" placeholder="Crie uma senha (mínimo 8 caracteres)" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} />
+    <div style={{ position: 'relative' }}>
+      <input className="input" style={{ paddingRight: 46 }} type={showPassword ? 'text' : 'password'} placeholder="Crie uma senha (mínimo 8 caracteres)" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} />
+      <button type="button" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} title={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', color: 'var(--muted)', padding: 6, cursor: 'pointer' }}><Icon name={showPassword ? 'eye-off' : 'eye'} /></button>
+    </div>
     <div style={{ height: 10 }} />
-    <input className="input" type="password" placeholder="Confirme sua senha" autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)} />
+    <div style={{ position: 'relative' }}>
+      <input className="input" style={{ paddingRight: 46 }} type={showConfirm ? 'text' : 'password'} placeholder="Confirme sua senha" autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)} />
+      <button type="button" aria-label={showConfirm ? 'Ocultar confirmação da senha' : 'Mostrar confirmação da senha'} title={showConfirm ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowConfirm(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', color: 'var(--muted)', padding: 6, cursor: 'pointer' }}><Icon name={showConfirm ? 'eye-off' : 'eye'} /></button>
+    </div>
     {inviteOnly && <>
       <div style={{ height: 10 }} />
       <input className="input" placeholder="Código de convite" maxLength={40} value={code} onChange={e => setCode(e.target.value.toUpperCase())} />
@@ -67,6 +75,7 @@ export default function Login() {
   const { setUser, pullState } = useStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const signIn = async () => {
@@ -97,7 +106,10 @@ export default function Login() {
       <div className="muted" style={{ marginBottom: 24 }}>Seus treinos. Seus pesos. Seu perfil.</div>
       <input className="input" type="email" placeholder="Seu e-mail" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && signIn()} />
       <div style={{ height: 10 }} />
-      <input className="input" type="password" placeholder="Sua senha" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && signIn()} />
+      <div style={{ position: 'relative' }}>
+        <input className="input" style={{ paddingRight: 46 }} type={showPassword ? 'text' : 'password'} placeholder="Sua senha" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && signIn()} />
+        <button type="button" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} title={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', color: 'var(--muted)', padding: 6, cursor: 'pointer' }}><Icon name={showPassword ? 'eye-off' : 'eye'} /></button>
+      </div>
       <div style={{ height: 14 }} />
       <Button variant="primary" icon="person" onClick={signIn} disabled={busy}>{busy ? 'Entrando…' : 'Entrar com e-mail e senha'}</Button>
       <div style={{ height: 10 }} />
