@@ -95,7 +95,7 @@ export default function Settings() {
           <input className="input" type="number" min="100" max="250" placeholder="Ex.: 170" value={S.profile?.heightCm ?? ''} onChange={e => update(s => { s.profile = { ...(s.profile || {}), heightCm: e.target.value === '' ? null : Math.max(100, Math.min(250, Number(e.target.value))) } })} />
         </label>
         <label className="small" style={{ gridColumn: '1 / -1' }}>Peso atual (kg)
-          <input className="input" type="number" min="25" max="350" step="0.1" placeholder="Ex.: 70" value={S.profile?.weightKg ?? (S.bodyweight?.length ? S.bodyweight[S.bodyweight.length - 1].w : '')} onChange={e => update(s => { s.profile = { ...(s.profile || {}), weightKg: e.target.value === '' ? null : Math.max(25, Math.min(350, Number(e.target.value))) } })} />
+          <input className="input" type="number" min="25" max="350" step="0.1" placeholder="Ex.: 70" value={S.profile?.weightKg ?? (S.bodyweight?.length ? Number((S.bodyweight[S.bodyweight.length - 1].w / (S.unit === 'lb' ? 2.20462 : 1)).toFixed(1)) : '')} onChange={e => update(s => { s.profile = { ...(s.profile || {}), weightKg: e.target.value === '' ? null : Math.max(25, Math.min(350, Number(e.target.value))) } })} />
         </label>
       </div>
     </Section>
